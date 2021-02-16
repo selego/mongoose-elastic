@@ -2,9 +2,9 @@
 
 Mongoose Elastic is a [mongoose](http://mongoosejs.com/) plugin that can automatically index your models into [elasticsearch](https://www.elastic.co/).
 
-[![Version](https://img.shields.io/npm/v/pg-anonymizer.svg)](https://npmjs.org/package/pg-anonymizer)
-[![Downloads/week](https://img.shields.io/npm/dw/pg-anonymizer.svg)](https://npmjs.org/package/pg-anonymizer)
-[![License](https://img.shields.io/npm/l/pg-anonymizer.svg)](https://github.com/rap2hpoutre/pg-anonymizer/blob/master/package.json)
+[![Version](https://img.shields.io/npm/v/@selego/mongoose-elastic.svg)](https://www.npmjs.com/package/@selego/mongoose-elastic)
+[![Downloads/week](https://img.shields.io/npm/dw/@selego/mongoose-elastic.svg)](https://www.npmjs.com/package/@selego/mongoose-elastic)
+[![License](https://img.shields.io/npm/l/@selego/mongoose-elastic.svg)](https://github.com/selego/mongoose-elastic/blob/master/package.json)
 
 ## Usage
 
