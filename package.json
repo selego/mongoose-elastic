@@ -1,0 +1,29 @@
+{
+  "name": "@selego/mongoose-elastic",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --detectOpenHandles --forceExit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/selego/mongoose-elastic.git"
+  },
+  "keywords": [
+    "mongoose",
+    "elasticsearch",
+    "mongodb"
+  ],
+  "author": "rap2hpoutre",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/selego/mongoose-elastic/issues"
+  },
+  "homepage": "https://github.com/selego/mongoose-elastic#readme",
+  "description": "",
+  "devDependencies": {
+    "@elastic/elasticsearch": "^7.11.0",
+    "jest": "^26.6.3",
+    "mongoose": "^5.11.16"
+  }
+}
