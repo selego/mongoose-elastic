@@ -19,7 +19,6 @@ test("readme example should work", async () => {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   });
-  console.log(await client.indices.exists({ index: "user" }));
   const user = new UserModel({
     name: "Raph",
     email: "raph@example.org",

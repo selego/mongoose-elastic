@@ -1,7 +1,7 @@
 {
   "name": "@selego/mongoose-elastic",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "jest --detectOpenHandles --forceExit"
   },
