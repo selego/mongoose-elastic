@@ -63,7 +63,7 @@ function MongooseElasticPlugin(schema, index, esClient) {
         const _opts = { index: indexName, type: typeName, refresh: true };
         _opts.body = serialize(this, mapping);
         _opts.id = this._id.toString();
-      await esClient.index(_opts);
+        await esClient.index(_opts);
       } catch (e) {
         console.log(`Error index ${this._id.toString()}`, e.message || e);
         return reject();
