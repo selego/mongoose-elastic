@@ -14,8 +14,6 @@ function MongooseElasticPlugin(schema, index, esClient) {
 
   //ElasticSearch Client
   async function createMapping() {
-    // const map = await esClient.indices.getMapping({ index: indexName });
-    // console.log("map", JSON.stringify(map.body.mission, null, 2));
     try {
       const exists = await esClient.indices.exists({ index: indexName });
       if (!exists) await esClient.indices.create({ index: indexName });
