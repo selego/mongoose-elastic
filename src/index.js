@@ -17,15 +17,6 @@ function MongooseElasticPlugin(schema, index, esClient) {
     try {
       const exists = await esClient.indices.exists({ index: indexName });
       if (!exists) await esClient.indices.create({ index: indexName });
-
-      const completeMapping = {};
-      completeMapping[typeName] = getMapping(schema);
-      await esClient.indices.putMapping({
-        index: indexName,
-        type: typeName,
-        include_type_name: true,
-        body: completeMapping,
-      });
     } catch (e) {
       console.log("Error update mapping", e.meta.body);
     }
@@ -40,7 +31,14 @@ function MongooseElasticPlugin(schema, index, esClient) {
         const exists = await esClient.indices.exists({ index: indexName });
         if (exists) await esClient.indices.delete({ index: indexName });
         await esClient.indices.create({ index: indexName });
-        await createMapping();
+        const completeMapping = {};
+        completeMapping[typeName] = getMapping(schema);
+        await esClient.indices.putMapping({
+          index: indexName,
+          type: typeName,
+          include_type_name: true,
+          body: completeMapping,
+        });
         console.log("Mapping created");
         resolve();
       } catch (e) {
