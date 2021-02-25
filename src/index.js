@@ -1,7 +1,6 @@
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
 function MongooseElastic(esClient) {
   return (schema, index) => MongooseElasticPlugin(schema, index, esClient);
 }
@@ -15,15 +14,50 @@ function MongooseElasticPlugin(schema, index, esClient) {
 
   //ElasticSearch Client
   async function createMapping() {
+    // const map = await esClient.indices.getMapping({ index: indexName });
+    // console.log("map", JSON.stringify(map.body.mission, null, 2));
     try {
       const exists = await esClient.indices.exists({ index: indexName });
       if (!exists) await esClient.indices.create({ index: indexName });
+
+      const completeMapping = {};
+      completeMapping[typeName] = getMapping(schema);
+      await esClient.indices.putMapping({
+        index: indexName,
+        type: typeName,
+        include_type_name: true,
+        body: completeMapping,
+      });
     } catch (e) {
-      console.log("Error update mapping", e);
+      console.log("Error update mapping", e.meta.body);
     }
   }
 
   createMapping();
+
+  //use this function if you want to update elastic search mapping
+  schema.statics.updateMapping = function schemaIndex() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const exists = await esClient.indices.exists({ index: indexName });
+        if (exists) await esClient.indices.delete({ index: indexName });
+        await esClient.indices.create({ index: indexName });
+        await createMapping();
+        console.log("Mapping created");
+        resolve();
+      } catch (e) {
+        console.log("Error update mapping", e);
+        reject();
+      }
+    });
+  };
+
+  schema.statics.logMapping = function schemaIndex() {
+    return new Promise(async (resolve, reject) => {
+      const map = await esClient.indices.getMapping({ index: indexName });
+      console.log("map", JSON.stringify(map.body.mission, null, 2));
+    });
+  };
 
   schema.methods.index = function schemaIndex() {
     return new Promise(async (resolve, reject) => {
@@ -31,7 +65,7 @@ function MongooseElasticPlugin(schema, index, esClient) {
         const _opts = { index: indexName, type: typeName, refresh: true };
         _opts.body = serialize(this, mapping);
         _opts.id = this._id.toString();
-        const t = await esClient.index(_opts);
+      await esClient.index(_opts);
       } catch (e) {
         console.log(`Error index ${this._id.toString()}`, e.message || e);
         return reject();
@@ -67,13 +101,17 @@ function MongooseElasticPlugin(schema, index, esClient) {
 
   schema.statics.synchronize = async function synchronize() {
     let count = 0;
-    await this.find({})
-      .cursor()
-      .eachAsync(async (u) => {
-        await u.index();
-        count++;
-        if (count % 100 == 0) console.log(`${count} indexed`);
-      });
+    try {
+      await this.find({})
+        .cursor()
+        .eachAsync(async (u) => {
+          await u.index();
+          count++;
+          if (count % 100 == 0) console.log(`${count} indexed`);
+        });
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   schema.statics.unsynchronize = function unsynchronize() {
@@ -186,9 +224,16 @@ function getMapping(schema) {
             fields: { keyword: { type: "keyword", ignore_above: 256 } },
           };
         }
+        const newschema = schema.paths[key].schema;
+        if (!newschema) break;
+        properties[key] = {
+          type: "nested",
+          properties: getMapping(newschema).properties,
+        };
 
         break;
       default:
+        console.log("default", mongooseType);
         break;
     }
   }
@@ -210,9 +255,15 @@ function serialize(model, mapping) {
           object[field],
           mappingData.properties[field]
         );
-        if (val !== undefined) {
-          serialized[field] = val;
-        }
+        if (val === undefined) continue;
+        if (
+          mappingData.properties[field].type === "geo_point" &&
+          val &&
+          (val.lat === undefined || val.lon === undefined)
+        )
+          continue;
+
+        serialized[field] = val;
       }
     }
     return serialized;
