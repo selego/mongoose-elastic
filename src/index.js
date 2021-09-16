@@ -1,12 +1,13 @@
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-function MongooseElastic(esClient) {
-  return (schema, index) => MongooseElasticPlugin(schema, index, esClient);
+function MongooseElastic(esClient, options = {}) {
+  return (schema, index) =>
+    MongooseElasticPlugin(schema, index, esClient, options);
 }
 
-function MongooseElasticPlugin(schema, index, esClient) {
-  const mapping = getMapping(schema);
+function MongooseElasticPlugin(schema, index, esClient, options) {
+  const mapping = getMapping(schema, options);
   const indexName = index;
   const typeName = "_doc";
 
@@ -171,7 +172,7 @@ function MongooseElasticPlugin(schema, index, esClient) {
   setUpMiddlewareHooks(schema);
 }
 
-function getMapping(schema) {
+function getMapping(schema, options) {
   const properties = {};
 
   for (let i = 0; i < Object.keys(schema.paths).length; i++) {
@@ -179,6 +180,7 @@ function getMapping(schema) {
 
     const exclude = ["id", "__v", "_id"];
     if (exclude.includes(key)) continue;
+    if (options && options.ignore && options.ignore.includes(key)) continue;
 
     const mongooseType = schema.paths[key].instance;
 

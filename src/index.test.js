@@ -9,8 +9,12 @@ test("readme example should work", async () => {
     name: String,
     email: String,
     city: String,
+    shouldBeIgnored: String,
   });
-  await User.plugin(mongooseElastic(client), "user");
+  await User.plugin(
+    mongooseElastic(client, { ignore: ["shouldBeIgnored"] }),
+    "user"
+  );
   const UserModel = await mongoose.model("user", User);
   expect(3).toBe(3);
 
@@ -20,9 +24,10 @@ test("readme example should work", async () => {
     useUnifiedTopology: true,
   });
   const user = new UserModel({
-    name: "Raph",
+    name: "Raph 2",
     email: "raph@example.org",
     city: "Nantes",
+    shouldBeIgnored: "hop",
   });
   await user.save();
   expect(3).toBe(3);
