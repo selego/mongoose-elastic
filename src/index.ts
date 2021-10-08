@@ -1,9 +1,18 @@
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
 function MongooseElastic(esClient, options = {}) {
   return (schema, index) =>
     MongooseElasticPlugin(schema, index, esClient, options);
+}
+
+interface OptionsForEsIndex {
+  index: string;
+  type: string;
+  refresh: boolean;
+  body?: any;
+  id?: string;
 }
 
 function MongooseElasticPlugin(schema, index, esClient, options) {
@@ -25,7 +34,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
 
   createMapping();
 
-  //use this function if you want to update elastic search mapping
+  // Use this function if you want to update elastic search mapping.
   schema.statics.updateMapping = function schemaIndex() {
     return new Promise(async (resolve, reject) => {
       try {
@@ -33,7 +42,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         if (exists) await esClient.indices.delete({ index: indexName });
         await esClient.indices.create({ index: indexName });
         const completeMapping = {};
-        completeMapping[typeName] = getMapping(schema);
+        completeMapping[typeName] = getMapping(schema, false);
         await esClient.indices.putMapping({
           index: indexName,
           type: typeName,
@@ -41,7 +50,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
           body: completeMapping,
         });
         console.log("Mapping created");
-        resolve();
+        resolve(true);
       } catch (e) {
         console.log("Error update mapping", e);
         reject();
@@ -59,7 +68,11 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
   schema.methods.index = function schemaIndex() {
     return new Promise(async (resolve, reject) => {
       try {
-        const _opts = { index: indexName, type: typeName, refresh: true };
+        const _opts: OptionsForEsIndex = {
+          index: indexName,
+          type: typeName,
+          refresh: true,
+        };
         _opts.body = serialize(this, mapping);
         _opts.id = this._id.toString();
         await esClient.index(_opts);
@@ -67,21 +80,25 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         console.log(`Error index ${this._id.toString()}`, e.message || e);
         return reject();
       }
-      resolve();
+      resolve(true);
     });
   };
 
   schema.methods.unIndex = function schemaUnIndex() {
     return new Promise(async (resolve, reject) => {
       try {
-        const _opts = { index: indexName, type: typeName, refresh: true };
+        const _opts: OptionsForEsIndex = {
+          index: indexName,
+          type: typeName,
+          refresh: true,
+        };
         _opts.id = this._id.toString();
 
         let tries = 3;
         while (tries > 0) {
           try {
             await esClient.delete(_opts);
-            return resolve();
+            return resolve(true);
           } catch (e) {
             console.log(e);
             await timeout(500);
@@ -92,7 +109,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         console.log(`Error delete ${this._id.toString()}`, e.message || e);
         return reject();
       }
-      resolve();
+      resolve(true);
     });
   };
 
@@ -119,7 +136,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
       } catch (e) {
         console.log("e", e);
       }
-      resolve();
+      resolve(true);
     });
   };
 
@@ -151,11 +168,11 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
             await postRemove(docs[i]);
           } catch (e) {}
         }
-        resolve();
+        resolve(true);
       });
     });
 
-    //deleteMany
+    // deleteMany
 
     inSchema.post("insertMany", (docs) => {
       return new Promise(async (resolve, reject) => {
@@ -164,7 +181,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
             await postSave(docs[i]);
           } catch (e) {}
         }
-        resolve();
+        resolve(true);
       });
     });
   }
@@ -189,8 +206,7 @@ function getMapping(schema, options) {
       continue;
     }
 
-    //geoloc
-
+    // Geoloc (legacy for internal use)
     if (key === "location.lat") continue;
     if (key === "location.lon") {
       properties["location"] = { type: "geo_point" };
@@ -226,7 +242,7 @@ function getMapping(schema, options) {
         if (!newschema) break;
         properties[key] = {
           type: "nested",
-          properties: getMapping(newschema).properties,
+          properties: getMapping(newschema, false).properties,
         };
 
         break;
