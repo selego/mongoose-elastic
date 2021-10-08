@@ -1,9 +1,15 @@
 {
   "name": "@selego/mongoose-elastic",
   "version": "1.4.0",
-  "main": "src/index.js",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "files": [
+    "lib/"
+  ],
   "scripts": {
-    "test": "jest --detectOpenHandles --forceExit"
+    "test": "jest --detectOpenHandles --forceExit",
+    "tsc": "tsc -p tsconfig.json && tsc -p tsconfig-cjs.json",
+    "prepublish": "npm run tsc"
   },
   "repository": {
     "type": "git",
@@ -22,8 +28,14 @@
   "homepage": "https://github.com/selego/mongoose-elastic#readme",
   "description": "",
   "devDependencies": {
+    "@babel/core": "^7.15.8",
+    "@babel/preset-env": "^7.15.8",
+    "@babel/preset-typescript": "^7.15.0",
     "@elastic/elasticsearch": "^7.11.0",
+    "@types/jest": "^27.0.2",
+    "babel-jest": "^27.2.5",
     "jest": "^26.6.3",
-    "mongoose": "^5.11.16"
+    "mongoose": "^5.11.16",
+    "typescript": "^4.4.3"
   }
 }

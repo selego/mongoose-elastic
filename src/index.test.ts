@@ -1,6 +1,6 @@
 const { Client } = require("@elastic/elasticsearch");
 const mongoose = require("mongoose");
-const mongooseElastic = require("./index.js");
+const mongooseElastic = require("./index.ts");
 
 test("readme example should work", async () => {
   const client = new Client({ node: "http://localhost:9200" });
@@ -16,7 +16,6 @@ test("readme example should work", async () => {
     "user"
   );
   const UserModel = await mongoose.model("user", User);
-  expect(3).toBe(3);
 
   mongoose.connect("mongodb://localhost:27017/test", {
     useCreateIndex: true,
