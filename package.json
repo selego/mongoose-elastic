@@ -1,6 +1,6 @@
 {
   "name": "@selego/mongoose-elastic",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "files": [
