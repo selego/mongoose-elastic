@@ -1,28 +1,29 @@
+import { Client } from "@elastic/elasticsearch";
+import { Schema } from "mongoose";
+
+// Temporary fix, should be fixed here: https://github.com/Automattic/mongoose/pull/10865
+declare module "mongoose" {
+  interface SchemaType {
+    caster?: SchemaType;
+  }
+}
+
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function MongooseElastic(esClient, options = {}) {
-  return (schema, index) =>
-    MongooseElasticPlugin(schema, index, esClient, options);
-}
-
-interface OptionsForEsIndex {
-  index: string;
-  type: string;
-  refresh: boolean;
-  body?: any;
-  id?: string;
-}
-
-function MongooseElasticPlugin(schema, index, esClient, options) {
+function MongooseElasticPlugin(
+  schema: Schema,
+  index: string,
+  esClient: Client,
+  options
+) {
   const mapping = getMapping(schema, options);
   const indexName = index;
   const typeName = "_doc";
 
   if (!esClient) return;
 
-  //ElasticSearch Client
   async function createMapping() {
     try {
       const exists = await esClient.indices.exists({ index: indexName });
@@ -68,14 +69,13 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
   schema.methods.index = function schemaIndex() {
     return new Promise(async (resolve, reject) => {
       try {
-        const _opts: OptionsForEsIndex = {
+        await esClient.index({
           index: indexName,
           type: typeName,
           refresh: true,
-        };
-        _opts.body = serialize(this, mapping);
-        _opts.id = this._id.toString();
-        await esClient.index(_opts);
+          body: serialize(this, mapping),
+          id: this._id.toString(),
+        });
       } catch (e) {
         console.log(`Error index ${this._id.toString()}`, e.message || e);
         return reject();
@@ -87,17 +87,15 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
   schema.methods.unIndex = function schemaUnIndex() {
     return new Promise(async (resolve, reject) => {
       try {
-        const _opts: OptionsForEsIndex = {
-          index: indexName,
-          type: typeName,
-          refresh: true,
-        };
-        _opts.id = this._id.toString();
-
         let tries = 3;
         while (tries > 0) {
           try {
-            await esClient.delete(_opts);
+            await esClient.delete({
+              index: indexName,
+              type: typeName,
+              refresh: true,
+              id: this._id.toString(),
+            });
             return resolve(true);
           } catch (e) {
             console.log(e);
@@ -152,10 +150,6 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
     return _doc.index();
   }
 
-  /**
-   * Use standard Mongoose Middleware hooks
-   * to persist to Elasticsearch
-   */
   function setUpMiddlewareHooks(inSchema) {
     inSchema.post("remove", postRemove);
     inSchema.post("findOneAndRemove", postRemove);
@@ -172,8 +166,6 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
       });
     });
 
-    // deleteMany
-
     inSchema.post("insertMany", (docs) => {
       return new Promise(async (resolve, reject) => {
         for (let i = 0; i < docs.length; i++) {
@@ -189,7 +181,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
   setUpMiddlewareHooks(schema);
 }
 
-function getMapping(schema, options) {
+function getMapping(schema: Schema, options) {
   const properties = {};
 
   for (let i = 0; i < Object.keys(schema.paths).length; i++) {
@@ -302,4 +294,7 @@ function serialize(model, mapping) {
   return outModel;
 }
 
-module.exports = MongooseElastic;
+export default function MongooseElastic(esClient: Client, options = {}) {
+  return (schema: Schema, index: string) =>
+    MongooseElasticPlugin(schema, index, esClient, options);
+}
