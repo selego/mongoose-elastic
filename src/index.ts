@@ -1,11 +1,20 @@
 import { Client } from "@elastic/elasticsearch";
-import { Schema } from "mongoose";
+import { Document, Schema } from "mongoose";
 
 // Temporary fix, should be fixed here: https://github.com/Automattic/mongoose/pull/10865
 declare module "mongoose" {
   interface SchemaType {
     caster?: SchemaType;
+    instance?: string;
+    options?: {
+      es_mapping: any;
+    };
+    schema?: any;
   }
+}
+
+interface IndexableDocument extends Document {
+  index(): Promise<boolean>;
 }
 
 function timeout(ms) {
@@ -116,7 +125,7 @@ function MongooseElasticPlugin(
     try {
       await this.find({})
         .cursor()
-        .eachAsync(async (u) => {
+        .eachAsync(async (u: IndexableDocument) => {
           await u.index();
           count++;
           if (count % 100 == 0) console.log(`${count} indexed`);
