@@ -198,16 +198,6 @@ function MongooseElasticPlugin(
     }
   };
 
-  /*
-        await esClient.index({
-          index: indexName,
-          type: typeName,
-          refresh: true,
-          body: serialize(this, mapping),
-          id: this._id.toString(),
-        });
-  */
-
   schema.statics.unsynchronize = function unsynchronize() {
     return new Promise(async (resolve, reject) => {
       try {
