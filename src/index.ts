@@ -1,5 +1,5 @@
 import { Client } from "@elastic/elasticsearch";
-import { Document, Schema } from "mongoose";
+import { Document, Model, Schema } from "mongoose";
 
 // Temporary fix, should be fixed here: https://github.com/Automattic/mongoose/pull/10865
 declare module "mongoose" {
@@ -17,6 +17,21 @@ interface IndexableDocument extends Document {
   index(): Promise<boolean>;
 }
 
+interface Mapping {
+  cast?: () => any;
+  properties: {
+    [key: string]: {
+      type?: string;
+      es_mapping?: any;
+      properties?: Mapping;
+    };
+  };
+}
+
+interface PluginOptions {
+  ignore?: string[];
+}
+
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -25,9 +40,9 @@ function MongooseElasticPlugin(
   schema: Schema,
   index: string,
   esClient: Client,
-  options
+  options: PluginOptions
 ) {
-  const mapping = getMapping(schema, options);
+  const mapping: Mapping = getMapping(schema, options);
   const indexName = index;
   const typeName = "_doc";
 
@@ -52,7 +67,7 @@ function MongooseElasticPlugin(
         if (exists) await esClient.indices.delete({ index: indexName });
         await esClient.indices.create({ index: indexName });
         const completeMapping = {};
-        completeMapping[typeName] = getMapping(schema, false);
+        completeMapping[typeName] = getMapping(schema, options);
         await esClient.indices.putMapping({
           index: indexName,
           type: typeName,
@@ -135,6 +150,64 @@ function MongooseElasticPlugin(
     }
   };
 
+  schema.statics.synchronizeBulk = async function synchronize(
+    bulkSize: number = 10_000
+  ) {
+    try {
+      let success = 0;
+      console.log("ℹ️ Indexing started");
+      while (true) {
+        const documents = await this.find().limit(bulkSize).skip(success);
+
+        if (documents.length === 0) break;
+
+        const bodyES = documents.flatMap((document) => {
+          let documentFormatted = serialize(document, mapping);
+          return [
+            { index: { _index: indexName, _id: document._id.toString() } },
+            documentFormatted,
+          ];
+        });
+        const { body: esResponse } = await esClient.bulk({
+          refresh: true,
+          body: bodyES,
+        });
+
+        // ? Error ES BULK
+        if (esResponse.errors) {
+          const erroredDocuments = [];
+          esResponse.items.forEach((action, i) => {
+            const operation = Object.keys(action)[0];
+            if (action[operation].error) {
+              erroredDocuments.push({
+                status: action[operation].status,
+                error: action[operation].error,
+                operation: bodyES[i * 2],
+                document: bodyES[i * 2 + 1],
+              });
+            }
+          });
+          console.log(`❌ ERROR: ${erroredDocuments}`);
+        }
+
+        success += documents.length;
+        console.log(`✅  ${success} documents indexed`);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  /*
+        await esClient.index({
+          index: indexName,
+          type: typeName,
+          refresh: true,
+          body: serialize(this, mapping),
+          id: this._id.toString(),
+        });
+  */
+
   schema.statics.unsynchronize = function unsynchronize() {
     return new Promise(async (resolve, reject) => {
       try {
@@ -190,7 +263,7 @@ function MongooseElasticPlugin(
   setUpMiddlewareHooks(schema);
 }
 
-function getMapping(schema: Schema, options) {
+function getMapping(schema: Schema, options: PluginOptions): Mapping {
   const properties = {};
 
   for (let i = 0; i < Object.keys(schema.paths).length; i++) {
@@ -243,7 +316,7 @@ function getMapping(schema: Schema, options) {
         if (!newschema) break;
         properties[key] = {
           type: "nested",
-          properties: getMapping(newschema, false).properties,
+          properties: getMapping(newschema, options).properties,
         };
 
         break;
@@ -253,10 +326,10 @@ function getMapping(schema: Schema, options) {
     }
   }
 
-  return { properties };
+  return { properties } as Mapping;
 }
 
-function serialize(model, mapping) {
+function serialize(model: Document<any>, mapping: Mapping) {
   let name, outModel;
 
   function _serializeObject(object, mappingData) {
@@ -303,7 +376,10 @@ function serialize(model, mapping) {
   return outModel;
 }
 
-export default function MongooseElastic(esClient: Client, options = {}) {
+export default function MongooseElastic(
+  esClient: Client,
+  options: PluginOptions = {}
+) {
   return (schema: Schema, index: string) =>
     MongooseElasticPlugin(schema, index, esClient, options);
 }
