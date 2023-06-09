@@ -131,8 +131,19 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
 
   function postSave(doc) {
     if (!doc) return;
-    const _doc = new doc.constructor(doc);
-    return _doc.index();
+    if (options && options.selectiveIndexing) {
+      const ignoredProperties = options.ignore || [];
+      for (let key of doc.$locals._modifiedPaths) {
+        if (!ignoredProperties.includes(key)) {
+          // a non-ignored path was modified: the document is indexed
+          const _doc = new doc.constructor(doc);
+          return _doc.index();
+        }
+      }
+    } else {
+      const _doc = new doc.constructor(doc);
+      return _doc.index();
+    }
   }
 
   /**
@@ -144,6 +155,10 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
     inSchema.post("findOneAndRemove", postRemove);
     inSchema.post("save", postSave);
     inSchema.post("findOneAndUpdate", postSave);
+    schema.pre('save', function(next) {
+      this.$locals._modifiedPaths = this.modifiedPaths();
+      next();
+    });
     inSchema.pre("deleteMany", (docs) => {
       return new Promise(async (resolve, reject) => {
         for (let i = 0; i < docs.length; i++) {
