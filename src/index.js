@@ -129,7 +129,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
     return _doc.unIndex();
   }
 
-  function postSave(doc) {
+  async function postSave(doc) {
     if (!doc) return;
     if (options && options.selectiveIndexing) {
       const ignoredProperties = options.ignore || [];
@@ -137,11 +137,13 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         if (!ignoredProperties.includes(key)) {
           // a non-ignored path was modified: the document is indexed
           const _doc = new doc.constructor(doc);
+          if (Array.isArray(options.populate)) await _doc.populate(options.populate).execPopulate();
           return _doc.index();
         }
       }
     } else {
       const _doc = new doc.constructor(doc);
+      if (Array.isArray(options.populate)) await _doc.populate(options.populate).execPopulate();
       return _doc.index();
     }
   }
@@ -212,46 +214,57 @@ function getMapping(schema, options) {
       continue;
     }
 
-    switch (mongooseType) {
-      case "ObjectID":
-      case "String":
-        properties[key] = {
-          type: "text",
-          fields: { keyword: { type: "keyword", ignore_above: 256 } },
-        };
-        break;
-      case "Date":
-        properties[key] = { type: "date" };
-        break;
-      case "Number":
-        properties[key] = { type: "long" };
-        break;
-      case "Boolean":
-        properties[key] = { type: "boolean" };
-        break;
+    const esType = mongooseTypeToEsType(mongooseType, { schema, key });
+    if (esType) properties[key] = esType;
+  }
 
-      case "Array":
-        if (schema.paths[key].caster.instance === "String") {
-          properties[key] = {
-            type: "text",
-            fields: { keyword: { type: "keyword", ignore_above: 256 } },
-          };
-        }
-        const newschema = schema.paths[key].schema;
-        if (!newschema) break;
-        properties[key] = {
-          type: "nested",
-          properties: getMapping(newschema).properties,
-        };
-
-        break;
-      default:
-        console.log("default", mongooseType);
-        break;
+  if (options && Array.isArray(options.virtuals)) {
+    for (const virtual of options.virtuals) {
+      const esType = mongooseTypeToEsType(virtual.type, {});
+      if (esType) properties[virtual.key] = esType;
     }
   }
 
   return { properties };
+}
+
+function mongooseTypeToEsType(mongooseType, { schema, key }) {
+  switch (mongooseType) {
+    case "ObjectID":
+    case "String":
+      return {
+        type: "text",
+        fields: { keyword: { type: "keyword", ignore_above: 256 } },
+      };
+    case "Date":
+      return { type: "date" };
+    case "Number":
+      return { type: "long" };
+    case "Boolean":
+      return { type: "boolean" };
+
+    case "Array":
+      if (!schema || !key) {
+        console.warn("Array not yet supported for virtuals");
+        break;
+      }
+
+      if (schema.paths[key].caster.instance === "String") {
+        return {
+          type: "text",
+          fields: { keyword: { type: "keyword", ignore_above: 256 } },
+        };
+      }
+      const newschema = schema.paths[key].schema;
+      if (!newschema) break;
+      return {
+        type: "nested",
+        properties: getMapping(newschema).properties,
+      };
+    default:
+      console.log("default", mongooseType);
+      break;
+  }
 }
 
 function serialize(model, mapping) {
