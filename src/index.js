@@ -186,21 +186,21 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         resolve();
       });
     });
-  }
 
-  inSchema.post("updateMany", function () {
-    return new Promise(async (resolve, reject) => {
-      const query = this.getQuery();
-      const documents = await this.model.find(query);
+    inSchema.post("updateMany", function () {
+      return new Promise(async (resolve, reject) => {
+        const query = this.getQuery();
+        const documents = await this.model.find(query);
 
-      for (let i = 0; i < documents.length; i++) {
-        try {
-          await postSave(documents[i]);
-        } catch (e) {}
-      }
-      resolve();
+        for (let i = 0; i < documents.length; i++) {
+          try {
+            await postSave(documents[i]);
+          } catch (e) {}
+        }
+        resolve();
+      });
     });
-  });
+  }
 
   setUpMiddlewareHooks(schema);
 }
