@@ -137,13 +137,15 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         if (!ignoredProperties.includes(key)) {
           // a non-ignored path was modified: the document is indexed
           const _doc = new doc.constructor(doc);
-          if (Array.isArray(options.populate)) await _doc.populate(options.populate).execPopulate();
+          if (Array.isArray(options.populate))
+            await _doc.populate(options.populate).execPopulate();
           return _doc.index();
         }
       }
     } else {
       const _doc = new doc.constructor(doc);
-      if (Array.isArray(options.populate)) await _doc.populate(options.populate).execPopulate();
+      if (Array.isArray(options.populate))
+        await _doc.populate(options.populate).execPopulate();
       return _doc.index();
     }
   }
@@ -157,7 +159,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
     inSchema.post("findOneAndRemove", postRemove);
     inSchema.post("save", postSave);
     inSchema.post("findOneAndUpdate", postSave);
-    schema.pre('save', function(next) {
+    schema.pre("save", function (next) {
       this.$locals._modifiedPaths = this.modifiedPaths();
       next();
     });
@@ -185,6 +187,20 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
       });
     });
   }
+
+  inSchema.post("updateMany", function () {
+    return new Promise(async (resolve, reject) => {
+      const query = this.getQuery();
+      const documents = await this.model.find(query);
+
+      for (let i = 0; i < documents.length; i++) {
+        try {
+          await postSave(documents[i]);
+        } catch (e) {}
+      }
+      resolve();
+    });
+  });
 
   setUpMiddlewareHooks(schema);
 }
