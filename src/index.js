@@ -15,8 +15,12 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
 
   //ElasticSearch Client
   async function createMapping() {
-    const exists = await esClient.indices.exists({ index: indexName });
-    if (!exists) await esClient.indices.create({ index: indexName });
+    try {
+      const exists = await esClient.indices.exists({ index: indexName });
+      if (!exists) await esClient.indices.create({ index: indexName });
+    } catch (e) {
+      console.log("Error update mapping", e.meta.body);
+    }
   }
 
   createMapping();
@@ -47,15 +51,8 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
 
   schema.statics.logMapping = function schemaIndex() {
     return new Promise(async (resolve, reject) => {
-      try {
-        const map = await esClient.indices.getMapping({ index: indexName });
-        console.log("map", JSON.stringify(map.body.mission, null, 2));
-        if (!map) return reject();
-        resolve();
-      } catch (e) {
-        console.log("Error log mapping", e);
-        return reject();
-      }
+      const map = await esClient.indices.getMapping({ index: indexName });
+      console.log("map", JSON.stringify(map.body.mission, null, 2));
     });
   };
 
@@ -66,11 +63,11 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         _opts.body = serialize(this, mapping);
         _opts.id = this._id.toString();
         await esClient.index(_opts);
-        resolve();
       } catch (e) {
         console.log(`Error index ${this._id.toString()}`, e.message || e);
         return reject();
       }
+      resolve();
     });
   };
 
@@ -91,11 +88,11 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
             --tries;
           }
         }
-        resolve();
       } catch (e) {
         console.log(`Error delete ${this._id.toString()}`, e.message || e);
         return reject();
       }
+      resolve();
     });
   };
 
@@ -121,7 +118,6 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
         if (exists) await esClient.indices.delete({ index: this.modelName });
       } catch (e) {
         console.log("e", e);
-        reject();
       }
       resolve();
     });
@@ -169,43 +165,39 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
     });
     inSchema.pre("deleteMany", (docs) => {
       return new Promise(async (resolve, reject) => {
-        try {
-          for (let i = 0; i < docs.length; i++) {
+        for (let i = 0; i < docs.length; i++) {
+          try {
             await postRemove(docs[i]);
-          }
-          resolve();
-        } catch (e) {
-          console.log(e);
-          reject();
+          } catch (e) {}
         }
+        resolve();
       });
     });
+
+    //deleteMany
 
     inSchema.post("insertMany", (docs) => {
       return new Promise(async (resolve, reject) => {
-        try {
-          for (let i = 0; i < docs.length; i++) {
+        for (let i = 0; i < docs.length; i++) {
+          try {
             await postSave(docs[i]);
-          }
-          resolve();
-        } catch (e) {
-          console.log(e);
-          reject();
+          } catch (e) {}
         }
+        resolve();
       });
     });
 
-    inSchema.post("updateMany", (docs) => {
+    inSchema.post("updateMany", function () {
       return new Promise(async (resolve, reject) => {
-        try {
-          for (let i = 0; i < docs.length; i++) {
-            await postSave(docs[i]);
-          }
-          resolve();
-        } catch (e) {
-          console.log(e);
-          reject();
+        const query = this.getQuery();
+        const documents = await this.model.find(query);
+
+        for (let i = 0; i < documents.length; i++) {
+          try {
+            await postSave(documents[i]);
+          } catch (e) {}
         }
+        resolve();
       });
     });
   }
