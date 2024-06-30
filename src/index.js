@@ -286,7 +286,7 @@ function mongooseTypeToEsType(mongooseType, { schema, key }) {
         properties: getMapping(newschema).properties,
       };
     default:
-      console.log("default", mongooseType);
+      // console.log("default", mongooseType);
       break;
   }
 }
