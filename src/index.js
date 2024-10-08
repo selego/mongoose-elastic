@@ -155,7 +155,7 @@ function MongooseElasticPlugin(schema, index, esClient, options) {
    * to persist to Elasticsearch
    */
   function setUpMiddlewareHooks(inSchema) {
-    inSchema.post("remove", postRemove);
+    inSchema.post("deleteOne", postRemove);
     inSchema.post("findOneAndRemove", postRemove);
     inSchema.post("save", postSave);
     inSchema.post("findOneAndUpdate", postSave);
